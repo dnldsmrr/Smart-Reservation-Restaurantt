@@ -1,477 +1,594 @@
 import streamlit as st
-import time
+import uuid
+import base64
+import os
+import re
+import urllib.request
+import json
+import pandas as pd
+from utils import load_data, append_reservation, load_css, check_admin_login, GOLD, DARK, CREAM
+from dotenv import load_dotenv
 
+# ─────────────────── PAGE CONFIG ───────────────────
 st.set_page_config(
-    page_title="Smart Automation Reservation Assistant · Mandala Rasa Restaurant Dashboard",
-    page_icon="🍽️",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_title="Sara Nusantara — AI Reservation Assistant",
+    page_icon=":material/restaurant:",
+    layout="centered",
+    initial_sidebar_state="auto",
 )
 
-# Initialize session state
+# ─────────────────── LOGO B64 HELPER ───────────────────
+def get_base64_image(image_path):
+    try:
+        with open(image_path, "rb") as img_file:
+            return base64.b64encode(img_file.read()).decode("utf-8")
+    except:
+        return ""
+
+logo_path = os.path.join(os.path.dirname(__file__), "assets", "sara_logo.png")
+logo_b64 = get_base64_image(logo_path)
+LOGO_IMG_TAG = (
+    f'<img src="data:image/png;base64,{logo_b64}" '
+    f'style="width: 44px; height: 44px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.06); object-fit: cover;">'
+    if logo_b64 else '<div style="width:44px;height:44px;background:#EAEAEA;border-radius:10px;"></div>'
+)
+
+# ─────────────────── SESSION STATE ───────────────────
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
-if "show_admin_login" not in st.session_state:
-    st.session_state.show_admin_login = False
-# Admin password
-ADMIN_PASSWORD = "admin123"
 
-# ---------- Custom CSS ----------
-st.markdown("""
+if "pending_prompt" not in st.session_state:
+    st.session_state.pending_prompt = None
+
+# Load external stylesheets
+load_css("main.css")
+
+# Extra styles injected after main.css
+st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
-
-html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-}
-
-/* Sidebar */
-section[data-testid="stSidebar"] {
-    background: linear-gradient(160deg, #0f1923 0%, #1a2a3a 100%) !important;
-    border-right: 1px solid rgba(255,255,255,0.07);
-}
-section[data-testid="stSidebar"] * {
-    color: #e8dcc8 !important;
-}
-
-/* Main bg */
-.main .block-container {
-    background: #f7f3ee;
-    padding: 2rem 2.5rem;
-}
-
-/* Hero */
-.hero-wrap {
-    background: linear-gradient(135deg, #0f1923 0%, #1a2a3a 50%, #2c3e50 100%);
-    border-radius: 20px;
-    padding: 60px 50px;
-    color: #e8dcc8;
-    text-align: center;
-    margin-bottom: 2rem;
-    position: relative;
-    overflow: hidden;
-}
-.hero-wrap::before {
-    content: '';
-    position: absolute;
-    top: -40%;
-    left: -20%;
-    width: 60%;
-    height: 200%;
-    background: radial-gradient(ellipse, rgba(212,175,55,0.12) 0%, transparent 70%);
-    pointer-events: none;
-}
-.hero-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 3.2rem;
-    font-weight: 700;
-    margin: 0 0 0.5rem;
-    letter-spacing: -1px;
-    color: #e8dcc8;
-}
-.hero-sub {
-    font-size: 1.1rem;
-    color: rgba(232,220,200,0.7);
-    margin: 0 0 2rem;
-    font-weight: 300;
-}
-.hero-badge {
-    display: inline-block;
-    background: rgba(212,175,55,0.2);
-    border: 1px solid rgba(212,175,55,0.5);
-    color: #d4af37;
-    border-radius: 50px;
-    padding: 6px 20px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    letter-spacing: 1px;
-    margin-bottom: 1.5rem;
-    text-transform: uppercase;
-}
-
-/* Nav cards */
-.nav-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 1.5rem;
-    margin-top: 2rem;
-}
-.nav-card {
-    background: white;
-    border-radius: 16px;
-    padding: 2.5rem 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    border: 1px solid rgba(0,0,0,0.06);
-    box-shadow: 0 2px 12px rgba(0,0,0,0.05);
-    text-decoration: none;
-    display: block;
-}
-.nav-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 12px 32px rgba(0,0,0,0.1);
-    border-color: #d4af37;
-}
-.nav-icon {
-    font-size: 3rem;
-    margin-bottom: 1rem;
-}
-.nav-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: #0f1923;
-    margin-bottom: 0.5rem;
-}
-.nav-desc {
-    color: #666;
-    font-size: 0.92rem;
-    line-height: 1.6;
-}
-
-/* Stat mini */
-.mini-stats {
-    display: flex;
-    gap: 1rem;
-    margin-top: 2rem;
-    flex-wrap: wrap;
-}
-.mini-stat {
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 12px;
-    padding: 14px 20px;
-    flex: 1;
-    min-width: 140px;
-    text-align: center;
-}
-.mini-stat-val {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.6rem;
-    font-weight: 700;
-    color: #d4af37;
-}
-.mini-stat-lbl {
-    font-size: 0.78rem;
-    color: rgba(232,220,200,0.6);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-top: 2px;
-}
-
-/* Admin login input styling */
-.stTextInput > div > div > input {
-    border-radius: 10px !important;
-    border: 1.5px solid #e0d6c8 !important;
-    font-size: 0.93rem !important;
-}
-.stTextInput > div > div > input:focus {
-    border-color: #d4af37 !important;
-    box-shadow: 0 0 0 3px rgba(212,175,55,0.12) !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# Sidebar branding & Auth
-with st.sidebar:
-    st.markdown("### 🍽️ Smart Reservation")
-    st.markdown("---")
-
-    st.page_link("Beranda.py", label="🏠 Beranda")
-    if st.session_state.admin_logged_in:
-        st.page_link("pages/1_Dashboard_Analytics.py",    label="📊 Dashboard Analytics")
-        st.page_link("pages/2_Reservation_Management.py", label="📋 Manajemen Reservasi")
-    st.page_link("pages/3_AI_Assistant.py", label="🤖 AI Reservation Assistant")
-    st.markdown("---")
-
-    # Admin status indicator
-    if st.session_state.admin_logged_in:
-        st.markdown("""
-        <div style="background: rgba(212,175,55,0.1); border: 1px solid rgba(212,175,55,0.3); 
-             border-radius: 8px; padding: 10px; text-align: center; color: #d4af37; font-size: 0.85rem; font-weight: 600;">
-        ✓ Admin Mode Active
-        </div>
-        """, unsafe_allow_html=True)
-        st.markdown("---")
-
-    st.markdown("""
-**📍 Mandala Rasa**
-
-🕐 Senin–Minggu · 10:00–22:00
-
-🪑 Indoor · Outdoor · Garden  
-&nbsp;&nbsp;&nbsp;&nbsp;Bar · VIP Room · Private
-
-📞 (0341) 123-456  
-💬 WA: 0812-3456-7890
-""", unsafe_allow_html=True)
-    st.markdown("---")
-    st.markdown("<small style='opacity:0.6'>v1.0 · AI Assistant · Gemini Powered</small>", unsafe_allow_html=True)
-
-# ---- Admin button & login panel ----
-st.markdown("""
-<style>
-.admin-topbar {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 0.5rem;
-}
-.admin-topbar .stButton > button {
+/* Admin sidebar buttons - orange gradient */
+section[data-testid="stSidebar"] .stButton > button {{
     border-radius: 999px !important;
-    background: linear-gradient(135deg, #d4af37, #f7e6a4) !important;
-    color: #0f1923 !important;
-    font-weight: 700 !important;
-    font-size: 0.88rem !important;
-    padding: 0.4rem 1.1rem !important;
     border: none !important;
-    box-shadow: 0 3px 10px rgba(0,0,0,0.1) !important;
-    white-space: nowrap !important;
-}
-.admin-topbar .stButton > button:hover {
+    background: linear-gradient(135deg, #FF6B35, #FF8E66) !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    box-shadow: 0 4px 14px rgba(255,107,53,0.18) !important;
+}}
+section[data-testid="stSidebar"] .stButton > button:hover {{
+    opacity: 0.9 !important;
     transform: translateY(-1px) !important;
-    box-shadow: 0 5px 14px rgba(0,0,0,0.15) !important;
-}
-.admin-login-panel {
+}}
+
+/* Fixed full-width top nav bar (pure HTML) */
+.sara-nav-bar {{
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 72px;
+    z-index: 999998;
+    background: #FFFFFF;
+    border-bottom: 1px solid #EAEAEA;
+    padding: 0 2rem;
+    box-sizing: border-box;
     display: flex;
-    justify-content: flex-end;
-    margin-bottom: 1rem;
-}
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+}}
+.sara-nav-chip {{
+    background: {CREAM};
+    color: {GOLD};
+    border: 1px solid #FFE0D3;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
+}}
+
+/* Masuk / Admin popover — fixed at top-right, aligned with nav */
+div[data-testid="stPopover"] {{
+    position: fixed !important;
+    top: 14px !important;
+    right: 2rem !important;
+    z-index: 9999999 !important;
+    width: auto !important;
+}}
+div[data-testid="stPopover"] > button {{
+    border-radius: 20px !important;
+    background: #FF6B35 !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    font-weight: 600 !important;
+    font-size: 13px !important;
+    padding: 8px 20px !important;
+    box-shadow: 0 2px 8px rgba(255,107,53,0.22) !important;
+}}
+div[data-testid="stPopover"] > button:hover {{
+    background: #E55A2B !important;
+    opacity: 1 !important;
+}}
+
+/* Offset page content below fixed nav + leave room for Masuk button */
+.block-container {{
+    padding-top: 86px !important;
+}}
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown('<div class="admin-topbar">', unsafe_allow_html=True)
-if st.session_state.admin_logged_in:
-    if st.button("🚪 Logout", key="top_logout_button"):
-        st.session_state.admin_logged_in = False
-        st.session_state.show_admin_login = False
-        st.rerun()
-else:
-    if st.button("🔐 Admin Login", key="top_login_button"):
-        st.session_state.show_admin_login = not st.session_state.show_admin_login
-        st.rerun()
-st.markdown('</div>', unsafe_allow_html=True)
-
-if st.session_state.show_admin_login and not st.session_state.admin_logged_in:
-    _, login_col, _ = st.columns([1, 2, 1])
-    with login_col:
-        st.markdown("##### 🔐 Login Admin")
-        pwd = st.text_input("Password", type="password", placeholder="Masukkan password admin...", key="top_admin_pwd", label_visibility="collapsed")
-        btn_cols = st.columns([3, 2])
-        with btn_cols[0]:
-            if st.button("Masuk sebagai Admin", key="top_login_submit", use_container_width=True):
-                if pwd == ADMIN_PASSWORD:
-                    with st.spinner("Memproses login admin..."):
-                        time.sleep(0.5)
-                        st.session_state.admin_logged_in = True
-                        st.session_state.show_admin_login = False
-                        st.rerun()
-                else:
-                    st.error("❌ Password salah!")
-        with btn_cols[1]:
-            if st.button("Batal", key="top_login_cancel", use_container_width=True):
-                st.session_state.show_admin_login = False
-                st.rerun()
-
-# ---- Hero (admin only) ----
-if st.session_state.admin_logged_in:
-    st.markdown("""
-<div class="hero-wrap">
-    <div class="hero-badge" style="background: rgba(212,175,55,0.15); border-color: rgba(212,175,55,0.35); color: #d4af37;">✦ Mandala Rasa</div>
-    <h1 class="hero-title">Mandala Rasa</h1>
-    <p class="hero-sub">Platform Cerdas Manajemen Reservasi &amp; Analitik Bisnis Restoran</p>
-    <p style="color: #d4af37; font-size: 0.9rem; font-weight: 600; margin-top: 0.5rem;">➤ 🔓 Mode Admin Aktif</p>
-    <div class="mini-stats">
-        <div class="mini-stat">
-            <div class="mini-stat-val">500</div>
-            <div class="mini-stat-lbl">Total Reservasi</div>
+# ─────────────────── TOP NAV (pure HTML — no widgets inside) ───────────────────
+st.markdown(f"""
+<div class="sara-nav-bar">
+    <div style="display:flex;align-items:center;gap:14px;">
+        {LOGO_IMG_TAG}
+        <div>
+            <div style="font-weight:800;font-size:18px;color:{DARK};
+                 font-family:'Outfit',sans-serif;letter-spacing:-0.3px;line-height:1.1;">
+                Sara Nusantara
+            </div>
+            <div style="font-size:11px;color:#8E8E8E;margin-top:3px;
+                 display:flex;align-items:center;gap:5px;">
+                <span style="color:#28A745;font-size:9px;">●</span>
+                Online · AI Reservation Assistant
+            </div>
         </div>
-        <div class="mini-stat">
-            <div class="mini-stat-val">Rp508 Jt</div>
-            <div class="mini-stat-lbl">Total Revenue</div>
-        </div>
-        <div class="mini-stat">
-            <div class="mini-stat-val">4.03</div>
-            <div class="mini-stat-lbl">Avg Rating</div>
-        </div>
-        <div class="mini-stat">
-            <div class="mini-stat-val">266</div>
-            <div class="mini-stat-lbl">Total Pelanggan</div>
-        </div>
-        <div class="mini-stat">
-            <div class="mini-stat-val">147</div>
-            <div class="mini-stat-lbl">Completed</div>
-        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;padding-right:160px;">
+        <span class="sara-nav-chip">Sara Nusantara</span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ---- Nav Cards ----
-if st.session_state.admin_logged_in:
-    # Show all three cards for admin
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.markdown("""
-        <div class="nav-card">
-            <div class="nav-icon">📊</div>
-            <div class="nav-title">Dashboard Analytics</div>
-            <div class="nav-desc">Pantau KPI, tren reservasi, revenue, dan insight pelanggan secara real-time.</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.page_link("pages/1_Dashboard_Analytics.py", label="→ Buka Dashboard", use_container_width=True)
-
-    with col2:
-        st.markdown("""
-        <div class="nav-card">
-            <div class="nav-icon">📋</div>
-            <div class="nav-title">Manajemen Reservasi</div>
-            <div class="nav-desc">Cari, filter, lihat detail, dan ekspor data reservasi dengan mudah.</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.page_link("pages/2_Reservation_Management.py", label="→ Kelola Reservasi", use_container_width=True)
-
-    with col3:
-        st.markdown("""
-        <div class="nav-card">
-            <div class="nav-icon">🤖</div>
-            <div class="nav-title">AI Reservation Assistant</div>
-            <div class="nav-desc">Chatbot AI berbasis Gemini untuk reservasi, cek status, dan info restoran.</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.page_link("pages/3_AI_Assistant.py", label="→ Mulai Chat", use_container_width=True)
+# ─────────────────── MASUK / ADMIN BUTTON (fixed top-right via CSS) ───────────────────
+if not st.session_state.admin_logged_in:
+    with st.popover("Masuk"):
+        st.markdown("**Verifikasi Admin**")
+        with st.form("beranda_login_form", clear_on_submit=True):
+            pass_input = st.text_input("Kata Sandi", type="password",
+                label_visibility="collapsed", placeholder="Sandi...")
+            submitted = st.form_submit_button("Verifikasi", use_container_width=True)
+        if submitted:
+            if pass_input == "admin123":
+                st.session_state.admin_logged_in = True
+                st.switch_page("pages/1_Dashboard_Analytics.py")
+            else:
+                st.error("Sandi salah!")
 else:
-    # Show elegant welcome hero for customer
-    st.markdown("""
-    <style>
-    .welcome-hero {
-        background: linear-gradient(135deg, #0f1923 0%, #1a2a3a 60%, #1e3a2f 100%);
-        border-radius: 20px;
-        padding: 56px 48px 48px;
-        text-align: center;
-        margin: 0.5rem 0 2rem;
-        position: relative;
-        overflow: hidden;
-    }
-    .welcome-hero::before {
-        content: \'\';
-        position: absolute;
-        top: -30%;
-        right: -10%;
-        width: 50%;
-        height: 180%;
-        background: radial-gradient(ellipse, rgba(46,204,113,0.10) 0%, transparent 70%);
-        pointer-events: none;
-    }
-    .welcome-hero::after {
-        content: \'\';
-        position: absolute;
-        bottom: -20%;
-        left: -10%;
-        width: 40%;
-        height: 140%;
-        background: radial-gradient(ellipse, rgba(212,175,55,0.07) 0%, transparent 70%);
-        pointer-events: none;
-    }
-    .welcome-badge {
-        display: inline-block;
-        background: rgba(46,204,113,0.15);
-        border: 1px solid rgba(46,204,113,0.35);
-        color: #2ecc71;
-        border-radius: 50px;
-        padding: 6px 20px;
-        font-size: 0.8rem;
-        font-weight: 600;
-        letter-spacing: 1.5px;
-        text-transform: uppercase;
-        margin-bottom: 1.4rem;
-    }
-    .welcome-title {
-        font-family: \'Playfair Display\', serif;
-        font-size: 2.6rem;
-        font-weight: 700;
-        color: #e8dcc8;
-        margin: 0 0 0.6rem;
-        letter-spacing: -0.5px;
-        line-height: 1.2;
-    }
-    .welcome-title span { color: #d4af37; }
-    .welcome-sub {
-        color: rgba(232,220,200,0.65);
-        font-size: 1.05rem;
-        font-weight: 300;
-        margin: 0 0 2rem;
-        line-height: 1.7;
-        max-width: 480px;
-        display: inline-block;
-    }
-    .welcome-features {
-        display: flex;
-        justify-content: center;
-        gap: 1rem;
-        flex-wrap: wrap;
-        margin-bottom: 2rem;
-    }
-    .welcome-feature-chip {
-        background: rgba(255,255,255,0.06);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 50px;
-        padding: 8px 18px;
-        font-size: 0.83rem;
-        color: rgba(232,220,200,0.8);
-    }
-    .welcome-cta-wrap {
-        background: rgba(255,255,255,0.04);
-        border: 1px solid rgba(255,255,255,0.1);
-        border-radius: 16px;
-        padding: 28px 32px;
-        max-width: 420px;
-        margin: 0 auto 0.5rem;
-    }
-    .welcome-cta-icon { font-size: 2.4rem; margin-bottom: 0.6rem; }
-    .welcome-cta-title {
-        font-family: \'Playfair Display\', serif;
-        font-size: 1.3rem;
-        font-weight: 700;
-        color: #e8dcc8;
-        margin-bottom: 0.4rem;
-    }
-    .welcome-cta-desc {
-        color: rgba(232,220,200,0.55);
-        font-size: 0.88rem;
-        line-height: 1.6;
-    }
-    </style>
-    <div class="welcome-hero">
-        <div class="welcome-badge">✦ Selamat Datang</div>
-        <h1 class="welcome-title">Nikmati Pengalaman Makan<br>di <span>Mandala Rasa</span></h1>
-        <p class="welcome-sub">Reservasi meja dengan mudah, cepat, dan nyaman — langsung melalui asisten AI kami yang siap membantu 24/7.</p>
-        <div class="welcome-features">
-            <div class="welcome-feature-chip">⚡ Reservasi Instan</div>
-            <div class="welcome-feature-chip">🤖 AI-Powered</div>
-            <div class="welcome-feature-chip">📋 Cek Status Real-time</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    with st.popover(":material/manage_accounts: Admin"):
+        if st.button("Keluar Admin", icon=":material/logout:", use_container_width=True,
+                     key="nav_logout"):
+            st.session_state.admin_logged_in = False
+            st.toast("Admin keluar.")
+            st.rerun()
 
-    col_center = st.columns([1, 1.4, 1])
-    with col_center[1]:
-        st.markdown("""
-        <div style="
-            background: white;
-            border-radius: 16px;
-            padding: 2rem 2rem 1.4rem;
-            text-align: center;
-            border: 1px solid rgba(0,0,0,0.07);
-            box-shadow: 0 4px 20px rgba(0,0,0,0.07);
-            margin-top: 0.5rem;
-        ">
-            <div style="font-size: 2.2rem; margin-bottom: 0.5rem;">🤖</div>
-            <div style="font-family: 'Playfair Display', serif; font-size: 1.2rem; font-weight: 700; color: #0f1923; margin-bottom: 0.4rem;">SARA — AI Reservation Assistant</div>
-            <div style="color: #777; font-size: 0.87rem; line-height: 1.6; margin-bottom: 1.3rem;">Buat reservasi, cek ketersediaan meja, atau tanyakan informasi restoran kepada asisten AI kami.</div>
-        </div>
-        """, unsafe_allow_html=True)
-        st.page_link("pages/3_AI_Assistant.py", label="✦ Mulai Reservasi Sekarang", use_container_width=True)
+# ─────────────────── SIDEBAR ───────────────────
+if st.session_state.admin_logged_in:
+    with st.sidebar:
+        st.markdown("<h3 style='margin-top:0; padding-top:0; color:#FF6B35;'>Sara Nusantara</h3>", unsafe_allow_html=True)
+        st.write("Sistem manajemen reservasi Mandala Rasa.")
+        st.markdown("---")
+        st.page_link("Beranda.py", label="Halaman Chat Utama", icon=":material/chat:")
+        st.page_link("pages/1_Dashboard_Analytics.py", label="Dashboard Analytics", icon=":material/bar_chart:")
+        st.page_link("pages/2_Reservation_Management.py", label="Kelola Reservasi", icon=":material/table_chart:")
+        st.markdown("---")
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Percakapan Baru", icon=":material/refresh:", use_container_width=True):
+            st.session_state.session_id = str(uuid.uuid4())
+            st.session_state.messages = []
+            st.rerun()
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("Keluar Admin", icon=":material/logout:", use_container_width=True, key="beranda_sidebar_logout"):
+            st.session_state.admin_logged_in = False
+            st.toast("Admin keluar.")
+            st.rerun()
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.caption(f"Session: `{st.session_state.session_id[:8]}...`")
+else:
+    # Non-admin: completely hide sidebar and its toggle (no ghost space)
+    st.markdown(
+        """
+        <style>
+        section[data-testid="stSidebar"] { display: none !important; }
+        [data-testid="stSidebarCollapsedControl"] { display: none !important; }
+        button[data-testid="collapsedControl"] { display: none !important; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
 
-st.markdown("---")
-st.caption("© 2026 Smart Reservation Assistant · Kelompok 3 Hana Jatmiana · Dibuat dengan menggunakan Streamlit")
+# ─────────────────── DATA & CONSTANTS ───────────────────
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GOOGLE_API_KEY")
+df_reservasi = load_data()
+
+RESTAURANT_INFO = {
+    "nama": "Mandala Rasa",
+    "jam_operasional": "Senin–Minggu, 10:00–22:00 WIB",
+    "area": ["Indoor", "Outdoor", "Garden", "Bar Area", "VIP Room", "Private Room"],
+    "fasilitas": ["WiFi gratis", "Area parkir luas", "Smoking area terpisah",
+                  "Live music Jumat–Sabtu mulai 19:00",
+                  "Private room untuk acara eksklusif",
+                  "Aksesibel untuk pengguna kursi roda"],
+    "kebijakan": [
+        "Reservasi dibuat min. 2 jam sebelum kedatangan",
+        "Pembatalan gratis jika dilakukan H-1",
+        "No-show 3x akan masuk daftar blacklist",
+        "Deposit 50% untuk VIP Room & Private Room",
+        "Hewan peliharaan tidak diizinkan masuk",
+    ],
+    "menu_unggulan": ["Sate Maranggi Spesial", "Nasi Goreng Wagyu",
+                      "Premium Grill Platter", "Signature Mocktail"],
+    "kapasitas": {"Indoor": 80, "Outdoor": 60, "Garden": 80,
+                  "Bar Area": 40, "VIP Room": 60, "Private Room": 120},
+}
+
+SYSTEM_PROMPT = """Kamu adalah AI Reservation Assistant bernama "Sara Nusantara" untuk restoran Mandala Rasa.
+Kamu berbicara dalam Bahasa Indonesia yang ramah, hangat, dan profesional.
+
+Tugas utamamu:
+1. MEMBUAT RESERVASI — Kumpulkan: nama, jumlah orang, tanggal, waktu, area pilihan, occasion, special request. Konfirmasi semua detail sebelum memproses.
+2. CEK RESERVASI — Minta nama lengkap atau ID reservasi, lalu tampilkan detail.
+3. INFO RESTORAN — Jawab pertanyaan seputar jam operasional, area, fasilitas, kebijakan, menu.
+
+Info Restoran Mandala Rasa:
+- Jam: Senin–Minggu 10:00–22:00 WIB (tidak tutup hari libur nasional kecuali Lebaran)
+- Area: Indoor (80 pax), Outdoor (60), Garden (80), Bar Area (40), VIP Room (60), Private Room (120)
+- Fasilitas: WiFi gratis, Parkir luas, Smoking area, Live music Jum–Sab 19:00, Aksesibel kursi roda
+- Kebijakan: Reservasi min 2 jam sebelumnya. Batal gratis H-1. No-show 3x → blacklist. Deposit 50% untuk VIP/Private.
+- Menu andalan: Sate Maranggi Spesial, Nasi Goreng Wagyu, Premium Grill Platter, Signature Mocktail
+
+Panduan menjawab:
+- Gunakan bahasa yang ramah, hangat, dan profesional tanpa emoji
+- Jika ada info yang kurang untuk reservasi, tanya dengan sopan
+- Berikan jawaban yang terstruktur dan mudah dibaca
+- Akhiri setiap percakapan dengan tawaran bantuan lanjutan"""
+
+# ─────────────────── TOOLS ───────────────────
+def cek_reservasi_tool(query: str) -> dict:
+    q = query.strip().lower()
+    mask = (
+        df_reservasi["Nama Customer"].str.lower().str.contains(q, na=False) |
+        df_reservasi["Reservation ID"].str.lower().str.contains(q, na=False) |
+        df_reservasi["Customer ID"].str.lower().str.contains(q, na=False)
+    )
+    result = df_reservasi[mask].head(3)
+    if result.empty:
+        return {"found": False}
+    rows = []
+    for _, r in result.iterrows():
+        rows.append({
+            "id": r["Reservation ID"], "nama": r["Nama Customer"],
+            "tanggal": str(r["Tanggal"]), "waktu": str(r["Waktu Reservasi"]),
+            "area": r["Area Meja"], "pax": int(r["Jumlah Orang"]),
+            "status": r["Status Reservasi"], "occasion": r["Occasion"],
+        })
+    return {"found": True, "reservations": rows}
+
+def buat_reservasi_tool(nama, pax, tanggal, waktu,
+                        area="Indoor", occasion="Casual Dining",
+                        special_request="Tidak ada"):
+    import random
+    new_id = f"RSV{random.randint(10000, 99999):05d}"
+    customer_id = f"CUST{random.randint(1000, 9999):04d}"
+    duration = 120
+    table_size = max(2, min(pax, 12))
+    table_type = f"Meja {table_size} Orang"
+    table_number = random.randint(1, 60)
+    est_budget = 150000
+    total_estimasi = pax * est_budget
+
+    record = {
+        "Reservation ID": new_id,
+        "Customer ID": customer_id,
+        "Nama Customer": nama,
+        "No. HP": "",
+        "Email": "",
+        "Tanggal Reservasi": tanggal,
+        "Waktu Reservasi": waktu,
+        "Durasi (menit)": duration,
+        "Jumlah Orang": pax,
+        "Area Meja": area,
+        "Tipe Meja": table_type,
+        "Nomor Meja": table_number,
+        "Occasion": occasion,
+        "Special Request": special_request,
+        "Estimasi Budget/Orang (IDR)": est_budget,
+        "Total Estimasi (IDR)": total_estimasi,
+        "Metode Pembayaran": "Onsite",
+        "Channel Booking": "AI Assistant",
+        "Status Reservasi": "Confirmed",
+        "Rating": None,
+        "Catatan Staff": None,
+        "Tanggal": tanggal,
+        "Bulan": int(tanggal.split("-")[1]) if len(tanggal.split("-")) >= 2 else None,
+    }
+
+    result = append_reservation(record)
+    if not result.get("success", False):
+        return {
+            "success": False,
+            "error": result.get("error", "Gagal menyimpan reservasi lokal."),
+        }
+
+    warning_msg = result.get("warning")
+    global df_reservasi
+    new_row = pd.DataFrame([record])
+    new_row["Tanggal Reservasi"] = pd.to_datetime(new_row["Tanggal Reservasi"])
+    df_reservasi = pd.concat([df_reservasi, new_row], ignore_index=True)
+
+    output = {
+        "success": True, "reservation_id": new_id,
+        "detail": {"nama": nama, "pax": pax, "tanggal": tanggal,
+                   "waktu": waktu, "area": area, "occasion": occasion,
+                   "special_request": special_request, "status": "Confirmed"},
+    }
+    if warning_msg:
+        output["warning"] = warning_msg
+    return output
+
+# ─────────────────── GEMINI CALL ───────────────────
+def call_gemini(messages: list) -> str:
+    import urllib.request, json as jm, traceback
+
+    url = ("https://generativelanguage.googleapis.com/v1beta/"
+           "models/gemini-2.5-flash-lite:generateContent"
+           f"?key={GEMINI_API_KEY}")
+
+    contents = []
+    for m in messages:
+        role = "user" if m["role"] == "user" else "model"
+        if contents and contents[-1]["role"] == role:
+            contents[-1]["parts"][0]["text"] += "\n" + m["content"]
+        else:
+            contents.append({"role": role, "parts": [{"text": m["content"]}]})
+
+    if contents and contents[0]["role"] == "model":
+        contents = contents[1:]
+
+    payload = jm.dumps({
+        "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+        "contents": contents,
+        "generationConfig": {
+            "temperature": 0.75,
+            "maxOutputTokens": 1024,
+            "topP": 0.9,
+        }
+    }).encode("utf-8")
+
+    req = urllib.request.Request(url, data=payload,
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=25) as resp:
+            data = jm.loads(resp.read().decode("utf-8"))
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8")
+        return f"Gemini API error {e.code}: {body[:200]}"
+    except Exception:
+        return traceback.format_exc(limit=2)
+
+# ─────────────────── HEURISTIC FALLBACK ───────────────────
+def detect_intent(msg):
+    m = msg.lower()
+    if any(k in m for k in ["reservasi","pesan","booking","book","mau makan",
+                             "ingin makan","duduk","meja"]):
+        return "buat_reservasi"
+    if any(k in m for k in ["cek","status","check","konfirmasi","lihat reservasi"]):
+        return "cek_reservasi"
+    if any(k in m for k in ["jam","buka","tutup","area","fasilitas","kebijakan",
+                             "info","menu","parkir","wifi","kapasitas"]):
+        return "info_restoran"
+    if any(k in m for k in ["halo","hai","hello","hi","selamat","assalamualaikum",
+                             "apa kabar","good morning","good evening"]):
+        return "greeting"
+    return "general"
+
+def extract_params(msg):
+    params = {}
+    nm = re.search(r"(?:nama|atas nama|an\.?)\s+([A-Za-z][a-zA-Z\s]{2,30})",
+                   msg, re.IGNORECASE)
+    if nm: params["nama"] = nm.group(1).strip()
+    px = re.search(r"(\d+)\s*(?:orang|pax|tamu|person|guests?)", msg, re.IGNORECASE)
+    if px: params["pax"] = int(px.group(1))
+    dt = re.search(r"(\d{1,2})[/\-](\d{1,2})(?:[/\-](\d{2,4}))?", msg)
+    if dt:
+        d,mo = dt.group(1), dt.group(2)
+        yr = dt.group(3) or "2025"
+        yr = yr if len(yr)==4 else "20"+yr
+        params["tanggal"] = f"{yr}-{mo.zfill(2)}-{d.zfill(2)}"
+    tm = re.search(r"(\d{1,2})[:\.](\d{2})\s*(?:WIB)?|pukul\s+(\d{1,2})[:\.]?(\d{0,2})",
+                   msg, re.IGNORECASE)
+    if tm:
+        h = tm.group(3) or tm.group(1)
+        mn = tm.group(4) or tm.group(2) or "00"
+        params["waktu"] = f"{h.zfill(2)}:{mn.zfill(2)}"
+    for a in RESTAURANT_INFO["area"]:
+        if a.lower() in msg.lower(): params["area"] = a; break
+    occ_map = {"birthday":"Birthday","ulang tahun":"Birthday",
+               "anniversary":"Anniversary","bisnis":"Business Meeting",
+               "meeting":"Business Meeting","rapat":"Business Meeting",
+               "romantis":"Date Night","date":"Date Night",
+               "keluarga":"Family Gathering","family":"Family Gathering",
+               "arisan":"Arisan","wisuda":"Wisuda","lamaran":"Lamaran"}
+    for k,v in occ_map.items():
+        if k in msg.lower(): params["occasion"] = v; break
+    return params
+
+def heuristic_response(msg):
+    intent = detect_intent(msg)
+    params = extract_params(msg)
+
+    if intent == "greeting":
+        return ("Halo! Selamat datang di **Mandala Rasa**\n\n"
+                "Saya **Sara Nusantara**, asisten reservasi Anda. Ada yang bisa saya bantu?\n\n"
+                "• **Buat reservasi** meja\n"
+                "• **Cek status** reservasi\n"
+                "• **Info restoran** (jam, area, fasilitas, kebijakan)")
+
+    if intent == "cek_reservasi":
+        q = re.sub(r"(cek|status|check|reservasi|detail|atas nama|nama)\s*",
+                   "", msg, flags=re.IGNORECASE).strip()
+        if not q or len(q) < 2:
+            return "Silakan sebutkan **nama lengkap** atau **ID reservasi** Anda.\nContoh: *cek reservasi atas nama Budi*"
+        result = cek_reservasi_tool(q)
+        if not result["found"]:
+            return (f"Maaf, reservasi atas nama/ID **\"{q}\"** tidak ditemukan.\n\n"
+                    "Pastikan penulisan nama sudah benar, atau coba masukkan ID reservasi "
+                    "yang tertera di konfirmasi (contoh: RSV00001).")
+        rows = result["reservations"]
+        resp = f"Ditemukan **{len(rows)} reservasi**:\n\n"
+        for r in rows:
+            resp += (f"**{r['id']}** · {r['nama']}\n"
+                     f"Tanggal: {r['tanggal']} pukul {r['waktu']} · {r['pax']} orang\n"
+                     f"Area: {r['area']} · {r['occasion']}\n"
+                     f"Status: **{r['status']}**\n\n")
+        return resp.strip()
+
+    if intent == "buat_reservasi":
+        missing = []
+        if "nama"    not in params: missing.append("nama Anda")
+        if "pax"     not in params: missing.append("jumlah tamu")
+        if "tanggal" not in params: missing.append("tanggal (format DD/MM)")
+        if "waktu"   not in params: missing.append("waktu (contoh: 19:00)")
+        if missing:
+            return ("Saya siap membantu reservasi Anda!\n\n"
+                    "Mohon lengkapi informasi berikut:\n"
+                    + "".join(f"• {m}\n" for m in missing)
+                    + "\n**Contoh:** *Reservasi atas nama Sinta, 4 orang, "
+                      "20/07, jam 19:00, area Garden, untuk anniversary*")
+        result = buat_reservasi_tool(**{k: params[k] for k in params if k in
+                                        ["nama","pax","tanggal","waktu","area","occasion"]})
+        if not result.get("success", False):
+            return (f"Maaf, terjadi masalah saat menyimpan reservasi:\n"
+                    f"{result.get('error', 'Terjadi kesalahan tak terduga')}\n\n"
+                    "Silakan coba kembali atau hubungi admin.")
+
+        d = result["detail"]
+        warning_msg = result.get("warning")
+        response = (f"**Reservasi berhasil dibuat!**\n\n"
+                    f"┌ ID Reservasi: **`{result['reservation_id']}`**\n"
+                    f"├ Nama: {d['nama']}\n"
+                    f"├ Tamu: {d['pax']} orang\n"
+                    f"├ Tanggal: {d['tanggal']} pukul {d['waktu']}\n"
+                    f"├ Area: {d['area']}\n"
+                    f"├ Occasion: {d['occasion']}\n"
+                    f"└ Status: **Confirmed**\n\n"
+                    "Simpan ID reservasi Anda. Konfirmasi akan dikirim via WhatsApp.")
+        if warning_msg:
+            response += (f"\n\nCatatan: {warning_msg}\n"
+                         "Data tetap tersimpan secara lokal.")
+        return response
+
+    if intent == "info_restoran":
+        m = msg.lower()
+        info = RESTAURANT_INFO
+        if any(k in m for k in ["jam","buka","tutup","operasional"]):
+            return (f"**Jam Operasional Mandala Rasa:**\n\n"
+                    f"**{info['jam_operasional']}**\n\n"
+                    "Kami buka setiap hari, termasuk hari libur nasional "
+                    "(kecuali Lebaran Hari H).")
+        if any(k in m for k in ["area","meja","tempat","duduk","vip","private","kapasitas"]):
+            areas = "\n".join(f"• **{a}** — kapasitas ±{info['kapasitas'].get(a,'?')} orang"
+                              for a in info["area"])
+            return f"**Area yang Tersedia di Mandala Rasa:**\n\n{areas}"
+        if any(k in m for k in ["fasilitas","wifi","parkir","musik","aksesibel","smoking"]):
+            fac = "\n".join(f"• {f}" for f in info["fasilitas"])
+            return f"**Fasilitas Mandala Rasa:**\n\n{fac}"
+        if any(k in m for k in ["kebijakan","aturan","deposit","cancel","batal","no-show"]):
+            pol = "\n".join(f"• {p}" for p in info["kebijakan"])
+            return f"**Kebijakan Reservasi:**\n\n{pol}"
+        if any(k in m for k in ["menu","makanan","minuman","rekomendasi","recommend"]):
+            men = "\n".join(f"• {m2}" for m2 in info["menu_unggulan"])
+            return (f"**Menu Andalan Mandala Rasa:**\n\n{men}\n\n"
+                    "Untuk daftar menu lengkap, silakan kunjungi meja kami "
+                    "atau minta dari staf saat kedatangan.")
+        return (f"**Mandala Rasa — Info Singkat:**\n\n"
+                f"Jam: {info['jam_operasional']}\n"
+                f"Area: {', '.join(info['area'])}\n"
+                f"Fasilitas: WiFi · Parkir · Live Music (Jum-Sab)\n\n"
+                "Tanya lebih lanjut tentang: *jam buka*, *area meja*, "
+                "*fasilitas*, atau *kebijakan*?")
+
+    return ("Hmm, saya belum sepenuhnya memahami permintaan Anda.\n\n"
+            "Saya bisa membantu dengan:\n"
+            "• **Buat reservasi** — *Reservasi 4 orang, 20 Juli, jam 19:00*\n"
+            "• **Cek reservasi** — *Cek reservasi atas nama Andi*\n"
+            "• **Info restoran** — *Jam buka berapa? Ada WiFi?*\n\n"
+            "Silakan coba lagi dengan kalimat yang lebih spesifik.")
+
+def process_user_message(user_input: str) -> str:
+    reply = heuristic_response(user_input.strip())
+    if reply.startswith("Hmm, saya belum sepenuhnya memahami permintaan Anda"):
+        return call_gemini(st.session_state.messages + [{"role": "user", "content": user_input.strip()}])
+    return reply
+
+# ─────────────────── CHAT ACTIONS ───────────────────
+prompt = st.chat_input("Tanya Sara Nusantara sesuatu...")
+
+if st.session_state.pending_prompt:
+    prompt = st.session_state.pending_prompt
+    st.session_state.pending_prompt = None
+
+if prompt:
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+# ─────────────────── CHAT DISPLAY ───────────────────
+if not st.session_state.messages:
+    # Large centered greeting
+    st.markdown(
+        """
+        <div style="text-align: center; margin-top: 14vh; margin-bottom: 6vh;">
+            <h1 style="font-size: 36px; font-weight: 700; color: #2D2522; font-family: 'Outfit', sans-serif; letter-spacing: -1px; margin-bottom: 10px;">
+                Ada yang bisa Sara bantu?
+            </h1>
+            <p style="color: #666; font-size: 16px; font-family: 'Inter', sans-serif;">
+                Silakan pilih opsi cepat di bawah atau kirim pesan baru untuk memesan meja restoran.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+    
+    # Recommendation cards side-by-side
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Buat Reservasi", icon=":material/calendar_add_on:", use_container_width=True):
+            st.session_state.pending_prompt = "Saya ingin membuat reservasi meja"
+            st.rerun()
+    with col2:
+        if st.button("Cek Status Reservasi", icon=":material/search:", use_container_width=True):
+            st.session_state.pending_prompt = "Cek status reservasi saya"
+            st.rerun()
+
+else:
+    # Display message history using standard st.chat_message
+    for msg in st.session_state.messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+if prompt:
+    with st.chat_message("assistant"):
+        with st.spinner("Sara Nusantara sedang memproses..."):
+            try:
+                reply = process_user_message(prompt)
+                st.markdown(reply)
+                st.session_state.messages.append({"role": "assistant", "content": reply})
+            except Exception as e:
+                err_msg = f"Maaf, saya tidak bisa memproses permintaan Anda saat ini. ({e})"
+                st.error(err_msg)
+                st.session_state.messages.append({"role": "assistant", "content": err_msg})
+
+# Centered footer disclaimer pushed below the chat input
+st.markdown(
+    "<div class='footer-disclaimer'>"
+    "Sara Nusantara dapat membuat kesalahan. Harap periksa kembali informasi penting."
+    "</div>",
+    unsafe_allow_html=True
+)

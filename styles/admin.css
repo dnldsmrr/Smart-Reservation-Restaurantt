@@ -1,0 +1,59 @@
+/* ========================================================================= */
+/* Status Text Colors (Reservations)                                         */
+/* ========================================================================= */
+.status-pending { color: #FFA500; font-weight: bold; }
+.status-confirmed { color: #28A745; font-weight: bold; }
+.status-cancelled { color: #DC3545; font-weight: bold; }
+.status-completed { color: #007BFF; font-weight: bold; }
+.status-no_show { color: #6C757D; font-weight: bold; }
+
+.card {
+    padding: 1.5rem;
+    border-radius: 10px;
+    background-color: #f8f9fa;
+    margin-bottom: 1rem;
+    border-left: 5px solid #FF6B35;
+}
+
+
+/* ========================================================================= */
+/* Status Badge Backgrounds (Tables)                                         */
+/* ========================================================================= */
+.status-available { background-color: #d4edda; color: #155724; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+.status-reserved { background-color: #fff3cd; color: #856404; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+.status-occupied { background-color: #f8d7da; color: #721c24; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+.status-maintenance { background-color: #e2e3e5; color: #383d41; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; }
+
+
+/* ========================================================================= */
+/* Table Layout Grid Cards                                                   */
+/* ========================================================================= */
+.table-card-indoor, .table-card-outdoor, .table-card-vip {
+    background-color: #ffffff;
+    padding: 20px;
+    border-radius: 16px;
+    margin-bottom: 16px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    border: 1px solid #f0f0f0;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.table-card-indoor:hover, .table-card-outdoor:hover, .table-card-vip:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    border-color: #e0e0e0;
+}
+
+/* Subtle colored accent borders for areas */
+.table-card-indoor { border-top: 4px solid #4a90e2; }
+.table-card-outdoor { border-top: 4px solid #50e3c2; }
+.table-card-vip { border-top: 4px solid #9013fe; }
+
+.table-number {
+    font-size: 24px;
+    font-weight: 800;
+    color: #1a1a1a;
+    margin-bottom: 8px;
+    letter-spacing: -0.5px;
+}

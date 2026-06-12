@@ -251,81 +251,191 @@ MONTH_MAP = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"Mei",6:"Jun",
              7:"Jul",8:"Agu",9:"Sep",10:"Okt",11:"Nov",12:"Des"}
 
 STATUS_COLORS = {
-    "Confirmed":  "#2ecc71",
-    "Completed":  "#3498db",
-    "Pending":    "#f39c12",
-    "Cancelled":  "#e74c3c",
-    "No-show":    "#9b59b6",
+    "Confirmed":  "#28A745", # green
+    "Completed":  "#007BFF", # blue
+    "Pending":    "#FFA500", # orange
+    "Cancelled":  "#DC3545", # red
+    "No-show":    "#6C757D", # grey
+    "confirmed":  "#28A745",
+    "completed":  "#007BFF",
+    "pending":    "#FFA500",
+    "cancelled":  "#DC3545",
+    "no_show":    "#6C757D"
 }
 
-GOLD  = "#d4af37"
-DARK  = "#0f1923"
-CREAM = "#e8dcc8"
+GOLD  = "#FF6B35"  # Terracotta color mapping
+DARK  = "#2D2522"  # Charcoal color mapping
+CREAM = "#FFFBF8"  # Cream color mapping
 
 COMMON_CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap');
-html, body, [class*="css"] { font-family: 'DM Sans', sans-serif; }
-section[data-testid="stSidebar"] {
-    background: linear-gradient(160deg,#0f1923 0%,#1a2a3a 100%) !important;
-    border-right: 1px solid rgba(255,255,255,0.07);
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,500,0,0');
+
+/* Hide Streamlit chrome — keep sidebar toggle for mobile */
+#MainMenu { display: none !important; }
+header[data-testid="stHeader"] { background-color: transparent !important; }
+[data-testid="stToolbar"] { display: none !important; }
+footer { display: none !important; }
+.stDeployButton { display: none !important; }
+[data-testid="stSidebarCollapsedControl"] { display: flex !important; }
+button[data-testid="collapsedControl"] { display: flex !important; }
+
+html, body, [class*="css"] {
+    font-family: 'Inter', 'Outfit', sans-serif !important;
 }
-section[data-testid="stSidebar"] * { color: #e8dcc8 !important; }
-.main .block-container { background:#f7f3ee; padding:2rem 2.5rem; }
+
+/* Sidebar */
+section[data-testid="stSidebar"] {
+    background-color: #FFFFFF !important;
+    border-right: 1px solid #E5E5E5 !important;
+}
+
+.main .block-container {
+    background: #F4F4F4 !important;
+    padding: 2rem 2.5rem;
+}
+
+/* Full width when sidebar is collapsed */
+.stMainBlockContainer {
+    max-width: 100% !important;
+}
+
+/* Consistent orange-gradient buttons across all admin pages */
+.stButton > button,
+[data-testid="stFormSubmitButton"] > button {
+    border-radius: 999px !important;
+    border: none !important;
+    background: linear-gradient(135deg, #FF6B35, #FF8E66) !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    box-shadow: 0 6px 20px rgba(255,107,53,0.15) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.stButton > button:hover:not(:disabled),
+[data-testid="stFormSubmitButton"] > button:hover:not(:disabled) {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 10px 28px rgba(255,107,53,0.2) !important;
+}
+.stButton > button:disabled,
+[data-testid="stFormSubmitButton"] > button:disabled {
+    background: #e2e2e2 !important;
+    color: #7a7a7a !important;
+    box-shadow: none !important;
+}
 
 /* KPI Card */
 .kpi-card {
     background: white;
     border-radius: 14px;
     padding: 1.4rem 1.6rem;
-    border-left: 4px solid var(--accent,#d4af37);
+    border-left: 4px solid var(--accent,#FF6B35);
     box-shadow: 0 2px 12px rgba(0,0,0,0.05);
     margin-bottom: 1rem;
 }
-.kpi-label { font-size:0.78rem; text-transform:uppercase; letter-spacing:1px;
-             color:#888; font-weight:600; margin-bottom:4px; }
-.kpi-value { font-family:'Playfair Display',serif; font-size:2rem;
-             font-weight:700; color:#0f1923; line-height:1.1; }
-.kpi-sub   { font-size:0.8rem; color:#aaa; margin-top:4px; }
+.kpi-label {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+.kpi-value {
+    font-family: 'Outfit', sans-serif;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2D2522;
+    line-height: 1.1;
+}
+.kpi-sub {
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-top: 4px;
+}
 
 /* Section title */
 .section-title {
-    font-family:'Playfair Display',serif;
-    font-size:1.35rem; font-weight:700;
-    color:#0f1923; margin:2rem 0 1rem;
-    display:flex; align-items:center; gap:10px;
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #2D2522;
+    margin: 2rem 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 .section-title::after {
-    content:''; flex:1; height:1px;
-    background:linear-gradient(to right,#d4af37,transparent);
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, #FF6B35, transparent);
 }
 
 /* Badge */
 .badge {
-    display:inline-block; border-radius:50px;
-    padding:3px 12px; font-size:0.78rem; font-weight:600;
+    display: inline-block;
+    border-radius: 50px;
+    padding: 3px 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
 }
 .back-button-wrapper {
-    display:flex; justify-content:center; margin-top:1.5rem;
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
 }
 .back-button {
-    display:inline-flex; align-items:center; gap:0.75rem;
-    padding:0.95rem 1.4rem; border-radius:999px;
-    background: linear-gradient(135deg,#d4af37,#f7e6a4);
-    color:#0f1923; text-decoration:none; font-weight:700;
-    box-shadow:0 14px 32px rgba(212,175,55,0.18);
-    transition:transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.95rem 1.4rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #FF6B35, #FF8E66);
+    color: #FFFFFF;
+    text-decoration: none;
+    font-weight: 700;
+    box-shadow: 0 14px 32px rgba(255, 107, 53, 0.18);
+    transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
 }
 .back-button:hover {
-    transform:translateY(-2px);
-    box-shadow:0 18px 38px rgba(212,175,55,0.22);
-    opacity:0.98;
+    transform: translateY(-2px);
+    box-shadow: 0 18px 38px rgba(255, 107, 53, 0.22);
+    opacity: 0.98;
+    color: #FFFFFF !important;
 }
 .back-button-icon {
-    display:inline-flex; align-items:center; justify-content:center;
-    width:2.2rem; height:2.2rem; border-radius:50%;
-    background:rgba(15,25,35,0.08); color:#0f1923;
-    font-size:1.05rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    color: #FFFFFF;
+    font-size: 1.05rem;
 }
 </style>
 """
+
+def load_css(css_file_name: str):
+    """Load a CSS file from the styles/ directory and inject it into the Streamlit app."""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    css_path = os.path.join(current_dir, "styles", css_file_name)
+    
+    if os.path.exists(css_path):
+        try:
+            with open(css_path, "r", encoding="utf-8") as f:
+                st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Error loading CSS: {e}")
+    else:
+        st.warning(f"CSS stylesheet not found: {css_file_name}")
+
+def check_admin_login():
+    """Redirect to Beranda if admin session is not active."""
+    if "admin_logged_in" not in st.session_state:
+        st.session_state.admin_logged_in = False
+    if not st.session_state.admin_logged_in:
+        st.switch_page("Beranda.py")
+        st.stop()
