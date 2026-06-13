@@ -1,10 +1,20 @@
 import streamlit as st
 import pandas as pd
-import sys, os
+import sys, os, base64
 from datetime import date
 from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from utils import load_mysql_data, load_local_data, COMMON_CSS, STATUS_COLORS, check_admin_login
+from utils import load_mysql_data, load_local_data, COMMON_CSS, STATUS_COLORS, GOLD, DARK, CREAM, check_admin_login
+
+# ── Logo helper ──
+def _get_b64(path):
+    try:
+        with open(path, "rb") as f: return base64.b64encode(f.read()).decode()
+    except: return ""
+
+_logo_b64 = _get_b64(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "assets", "sara_logo.png"))
+_LOGO = (f'<img src="data:image/png;base64,{_logo_b64}" style="width:44px;height:44px;border-radius:10px;box-shadow:0 2px 5px rgba(0,0,0,0.06);object-fit:cover;">'
+         if _logo_b64 else '<div style="width:44px;height:44px;background:#EAEAEA;border-radius:10px;"></div>')
 
 # Initialize session state BEFORE set_page_config
 if "admin_logged_in" not in st.session_state:
@@ -17,9 +27,41 @@ st.set_page_config(page_title="Manajemen Reservasi · Smart Reservation",
                    page_icon=":material/table_chart:", layout="wide",
                    initial_sidebar_state=_sidebar_state)
 st.markdown(COMMON_CSS, unsafe_allow_html=True)
+st.markdown(f"""<style>
+.sara-nav-bar{{position:fixed;top:0;left:0;right:0;height:72px;z-index:999998;
+    background:#FFFFFF;border-bottom:1px solid #EAEAEA;padding:0 2rem;
+    box-sizing:border-box;display:flex;align-items:center;
+    justify-content:space-between;box-shadow:0 1px 6px rgba(0,0,0,0.04);}}
+.sara-nav-chip{{background:{CREAM};color:{GOLD};border:1px solid #FFE0D3;
+    border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;
+    font-family:'Inter',sans-serif;white-space:nowrap;}}
+</style>""", unsafe_allow_html=True)
 
 # ✅ Authentication Check
 check_admin_login()
+
+# ── Top nav bar ──
+st.markdown(f"""
+<div class="sara-nav-bar">
+    <div style="display:flex;align-items:center;gap:14px;">
+        {_LOGO}
+        <div>
+            <div style="font-weight:800;font-size:18px;color:{DARK};
+                 font-family:'Outfit',sans-serif;letter-spacing:-0.3px;line-height:1.1;">
+                Sara Nusantara
+            </div>
+            <div style="font-size:11px;color:#8E8E8E;margin-top:3px;
+                 display:flex;align-items:center;gap:5px;">
+                <span style="color:{GOLD};font-size:9px;">●</span>
+                Admin Panel · Mandala Rasa
+            </div>
+        </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+        <span class="sara-nav-chip">Admin Panel</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 
 # Floating "Show Menu" FAB — only rendered when sidebar is collapsed
 if not st.session_state.admin_sidebar_open:
@@ -51,7 +93,7 @@ div.element-container:has(#sara-show-menu-marker)+div.element-container:has(.stB
 
 st.markdown("""
 <style>
-.main .block-container { background:#F4F4F4 !important; padding:1.8rem 2.2rem !important; }
+.main .block-container { background:#F4F4F4 !important; padding:86px 2.2rem 1.8rem !important; }
 
 /* ── Header ── */
 .page-header {

@@ -293,7 +293,34 @@ section[data-testid="stSidebar"] {
 
 .main .block-container {
     background: #F4F4F4 !important;
-    padding: 2rem 2.5rem;
+    padding: 86px 2.5rem 2rem !important;
+}
+
+/* ── Fixed full-width top nav bar (shared by all pages) ── */
+.sara-nav-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 72px;
+    z-index: 999998;
+    background: #FFFFFF;
+    border-bottom: 1px solid #EAEAEA;
+    padding: 0 2rem;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+}
+.sara-nav-chip {
+    background: #FFFBF8;
+    color: #FF6B35;
+    border: 1px solid #FFE0D3;
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    white-space: nowrap;
 }
 
 /* Full width when sidebar is collapsed */
