@@ -6,17 +6,48 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from utils import load_mysql_data, load_local_data, COMMON_CSS, STATUS_COLORS, check_admin_login
 
-# Initialize session state
+# Initialize session state BEFORE set_page_config
 if "admin_logged_in" not in st.session_state:
     st.session_state.admin_logged_in = False
+if "admin_sidebar_open" not in st.session_state:
+    st.session_state.admin_sidebar_open = True
 
+_sidebar_state = "expanded" if st.session_state.admin_sidebar_open else "collapsed"
 st.set_page_config(page_title="Manajemen Reservasi · Smart Reservation",
                    page_icon=":material/table_chart:", layout="wide",
-                   initial_sidebar_state="auto")
+                   initial_sidebar_state=_sidebar_state)
 st.markdown(COMMON_CSS, unsafe_allow_html=True)
 
 # ✅ Authentication Check
 check_admin_login()
+
+# Floating "Show Menu" FAB — only rendered when sidebar is collapsed
+if not st.session_state.admin_sidebar_open:
+    st.markdown("""<style>
+div.element-container:has(#sara-show-menu-marker)+div.element-container .stButton>button{
+    position:fixed!important;top:14px!important;left:14px!important;
+    z-index:9999990!important;width:46px!important;height:46px!important;
+    min-height:46px!important;border-radius:12px!important;padding:0!important;
+    background:linear-gradient(135deg,#FF6B35,#FF8E66)!important;
+    box-shadow:0 4px 14px rgba(255,107,53,0.4)!important;border:none!important;
+    transition:transform 0.18s ease,box-shadow 0.18s ease!important;
+}
+div.element-container:has(#sara-show-menu-marker)+div.element-container .stButton>button:hover{
+    transform:scale(1.08)!important;box-shadow:0 6px 18px rgba(255,107,53,0.5)!important;
+}
+div.element-container:has(#sara-show-menu-marker)+div.element-container .stButton>button svg,
+div.element-container:has(#sara-show-menu-marker)+div.element-container .stButton>button svg path,
+div.element-container:has(#sara-show-menu-marker)+div.element-container .stButton>button span{
+    fill:white!important;color:white!important;
+}
+div.element-container:has(#sara-show-menu-marker),
+div.element-container:has(#sara-show-menu-marker)+div.element-container:has(.stButton){
+    height:0!important;overflow:visible!important;margin:0!important;padding:0!important;
+}
+</style><span id="sara-show-menu-marker" style="display:none;"></span>""", unsafe_allow_html=True)
+    if st.button("", icon=":material/menu:", key="show_sidebar_btn"):
+        st.session_state.admin_sidebar_open = True
+        st.rerun()
 
 st.markdown("""
 <style>
@@ -107,8 +138,7 @@ with st.sidebar:
         st.session_state.admin_logged_in = False
         st.toast("Admin keluar.")
         st.rerun()
-        
-    st.markdown("---")
+
 
 # ── Load data ──
 df_all = load_mysql_data()

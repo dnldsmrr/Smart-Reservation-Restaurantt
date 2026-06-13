@@ -415,6 +415,41 @@ section[data-testid="stSidebar"] {
     color: #FFFFFF;
     font-size: 1.05rem;
 }
+
+/* ── Floating "Show Menu" FAB when sidebar is collapsed ── */
+div.element-container:has(#sara-show-menu-marker) + div.element-container .stButton > button {
+    position: fixed !important;
+    top: 12px !important;
+    left: 12px !important;
+    z-index: 99999 !important;
+    width: 46px !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    border-radius: 12px !important;
+    padding: 0 !important;
+    background: linear-gradient(135deg, #FF6B35, #FF8E66) !important;
+    box-shadow: 0 4px 14px rgba(255,107,53,0.4) !important;
+    border: none !important;
+    transition: transform 0.18s ease, box-shadow 0.18s ease !important;
+}
+div.element-container:has(#sara-show-menu-marker) + div.element-container .stButton > button:hover {
+    transform: scale(1.08) !important;
+    box-shadow: 0 6px 18px rgba(255,107,53,0.5) !important;
+}
+div.element-container:has(#sara-show-menu-marker) + div.element-container .stButton > button *,
+div.element-container:has(#sara-show-menu-marker) + div.element-container .stButton > button svg,
+div.element-container:has(#sara-show-menu-marker) + div.element-container .stButton > button svg path {
+    fill: white !important;
+    color: white !important;
+}
+/* Prevent the FAB element container from occupying layout space */
+div.element-container:has(#sara-show-menu-marker),
+div.element-container:has(#sara-show-menu-marker) + div.element-container:has(.stButton) {
+    height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}
 </style>
 """
 
@@ -436,6 +471,8 @@ def check_admin_login():
     """Redirect to Beranda if admin session is not active."""
     if "admin_logged_in" not in st.session_state:
         st.session_state.admin_logged_in = False
+    if "admin_sidebar_open" not in st.session_state:
+        st.session_state.admin_sidebar_open = True
     if not st.session_state.admin_logged_in:
         st.switch_page("Beranda.py")
         st.stop()
