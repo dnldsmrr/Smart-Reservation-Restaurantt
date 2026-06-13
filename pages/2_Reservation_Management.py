@@ -433,5 +433,260 @@ else:
             </div>
             """, unsafe_allow_html=True)
 
+# ══════════════ KETERSEDIAAN MEJA ══════════════
+import datetime as _dt
+
+st.markdown('<div class="section-title"><span class="material-symbols-outlined" style="vertical-align:middle;font-size:1.2rem;margin-right:6px;">chair</span>Ketersediaan Meja</div>', unsafe_allow_html=True)
+
+st.markdown("""
+<style>
+/* ── Availability Section ── */
+.avail-date-label {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #888;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.avail-stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 1.2rem;
+}
+.avail-stat-card {
+    border-radius: 12px;
+    padding: 14px 16px;
+    text-align: center;
+    border: 1.5px solid transparent;
+}
+.avail-stat-card .stat-val {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.7rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 4px;
+}
+.avail-stat-card .stat-lbl {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    font-weight: 600;
+    opacity: 0.75;
+}
+.avail-stat-card.card-total { background: #FFF9F6; border-color: #FFD5C2; color: #FF6B35; }
+.avail-stat-card.card-busy  { background: #fde8e8; border-color: #e8a9a9; color: #c0392b; }
+.avail-stat-card.card-free  { background: #e8fde8; border-color: #a9e8a9; color: #1a7a1a; }
+.avail-stat-card.card-pct   { background: #fff8e1; border-color: #f0c030; color: #7a5800; }
+.avail-note {
+    border-radius: 9px;
+    padding: 8px 14px;
+    font-size: 0.8rem;
+    color: #666;
+    background: #FFF9F6;
+    border: 1px solid #FFD5C2;
+    margin-bottom: 1.2rem;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# ── Master daftar meja per area ──
+ALL_TABLES = {
+    "Bar Area":     {29: "Bar Seat", 30: "Meja 2 Orang", 31: "Bar Seat", 32: "Bar Seat", 33: "Bar Seat"},
+    "Garden":       {21: "Meja 8 Orang", 22: "Meja 4 Orang", 23: "Meja 6 Orang",
+                     24: "Meja 6 Orang", 25: "Meja 6 Orang", 26: "Meja 6 Orang",
+                     27: "Meja 4 Orang", 28: "Meja 4 Orang"},
+    "Indoor":       {1: "Meja 6 Orang", 2: "Meja 4 Orang", 3: "Meja 2 Orang",
+                     4: "Meja 2 Orang", 5: "Meja 4 Orang", 6: "Meja 2 Orang",
+                     7: "Meja 4 Orang", 8: "Meja 2 Orang", 9: "Meja 4 Orang",
+                     10: "Meja 6 Orang", 11: "Meja 4 Orang", 12: "Meja 4 Orang"},
+    "Outdoor":      {13: "Meja 4 Orang", 14: "Meja 4 Orang", 15: "Meja 4 Orang",
+                     16: "Meja 6 Orang", 17: "Meja 6 Orang", 18: "Meja 4 Orang",
+                     19: "Meja 4 Orang", 20: "Meja 6 Orang"},
+    "Private Room": {39: "Meja 10 Orang", 40: "Meja 15 Orang", 41: "Meja 20 Orang"},
+    "VIP Room":     {34: "Meja 8 Orang", 35: "Meja 6 Orang", 36: "Meja 8 Orang",
+                     37: "Meja 6 Orang", 38: "Meja 8 Orang"},
+}
+
+AREA_ICONS = {
+    "Indoor": "home", "Outdoor": "park", "Garden": "local_florist",
+    "Bar Area": "local_bar", "VIP Room": "star", "Private Room": "lock",
+}
+
+# ── Kontrol: pilih tanggal ──
+ctrl_col1, ctrl_col2 = st.columns([2, 1])
+with ctrl_col1:
+    st.markdown('<div class="avail-date-label">Pilih Tanggal</div>', unsafe_allow_html=True)
+    selected_date = st.date_input(
+        "Pilih tanggal",
+        value=_dt.date.today(),
+        min_value=_dt.date(2026, 1, 1),
+        max_value=_dt.date(2026, 12, 31),
+        label_visibility="collapsed",
+        key="avail_date_picker"
+    )
+with ctrl_col2:
+    st.markdown('<div class="avail-date-label">Aksi Cepat</div>', unsafe_allow_html=True)
+    jump_cols = st.columns(2)
+    with jump_cols[0]:
+        if st.button("Hari Ini", use_container_width=True, key="btn_jump_today"):
+            st.session_state["avail_date_picker"] = _dt.date.today()
+            st.rerun()
+    with jump_cols[1]:
+        if st.button("Besok", use_container_width=True, key="btn_jump_tomorrow"):
+            st.session_state["avail_date_picker"] = _dt.date.today() + _dt.timedelta(days=1)
+            st.rerun()
+
+selected_date_str = selected_date.strftime("%Y-%m-%d")
+is_today  = (selected_date == _dt.date.today())
+date_label = f"Hari Ini ({selected_date_str})" if is_today else selected_date_str
+
+# ── Query reservasi aktif pada tanggal terpilih ──
+# Coba kolom "Tanggal" dulu, fallback ke "Tanggal Reservasi" (string)
+_tanggal_col = "Tanggal" if "Tanggal" in df_all.columns else "Tanggal Reservasi"
+active_on_date = df_all[
+    (df_all[_tanggal_col].astype(str).str[:10] == selected_date_str) &
+    (df_all["Status Reservasi"].isin(["Pending", "Confirmed"]))
+]
+
+# Buat lookup: Nomor Meja → list reservasi aktif
+busy_map: dict = {}
+for _, r in active_on_date.iterrows():
+    try:
+        mno = int(float(r.get("Nomor Meja", 0)))
+    except (ValueError, TypeError):
+        continue
+    if mno not in busy_map:
+        busy_map[mno] = []
+    busy_map[mno].append({
+        "waktu":  str(r.get("Waktu Reservasi", "?")),
+        "nama":   str(r.get("Nama Customer", "?"))[:12],
+        "status": str(r.get("Status Reservasi", "?")),
+    })
+
+# ── Summary stat cards ──
+total_all_tables = sum(len(t) for t in ALL_TABLES.values())
+total_busy       = len(busy_map)
+total_free       = total_all_tables - total_busy
+pct_free         = round(total_free / total_all_tables * 100) if total_all_tables else 0
+
+st.markdown(f"""
+<div class="avail-stat-row">
+    <div class="avail-stat-card card-total">
+        <div class="stat-val">{total_all_tables}</div>
+        <div class="stat-lbl">Total Meja</div>
+    </div>
+    <div class="avail-stat-card card-busy">
+        <div class="stat-val">{total_busy}</div>
+        <div class="stat-lbl">Terpakai</div>
+    </div>
+    <div class="avail-stat-card card-free">
+        <div class="stat-val">{total_free}</div>
+        <div class="stat-lbl">Tersedia</div>
+    </div>
+    <div class="avail-stat-card card-pct">
+        <div class="stat-val">{pct_free}%</div>
+        <div class="stat-lbl">Bebas</div>
+    </div>
+</div>
+<div class="avail-note">
+    <span class="material-symbols-outlined" style="font-size:0.9rem;vertical-align:middle;">calendar_today</span>
+    Tanggal: <b>{date_label}</b> &nbsp;·&nbsp;
+    Status <b>Pending</b> &amp; <b>Confirmed</b> dihitung sebagai meja terpakai
+</div>
+""", unsafe_allow_html=True)
+
+# ── Legend ──
+leg_col1, leg_col2, _ = st.columns([1, 1.8, 3])
+with leg_col1:
+    st.markdown('<div style="display:flex;align-items:center;gap:7px;font-size:0.82rem;color:#555;">'
+                '<div style="width:12px;height:12px;border-radius:50%;background:#2ecc71;flex-shrink:0;"></div>'
+                ' Tersedia</div>', unsafe_allow_html=True)
+with leg_col2:
+    st.markdown('<div style="display:flex;align-items:center;gap:7px;font-size:0.82rem;color:#555;">'
+                '<div style="width:12px;height:12px;border-radius:50%;background:#e74c3c;flex-shrink:0;"></div>'
+                ' Terpakai (Confirmed / Pending)</div>', unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom:0.8rem;'></div>", unsafe_allow_html=True)
+
+# ── Render per area menggunakan st.columns native ──
+COLS_PER_ROW = 5
+
+for area, tables in ALL_TABLES.items():
+    icon_name  = AREA_ICONS.get(area, "chair")
+    busy_here  = [no for no in tables if no in busy_map]
+    free_here  = [no for no in tables if no not in busy_map]
+    total_here = len(tables)
+
+    # Badge status area
+    if not busy_here:
+        badge = '<span style="background:#e8fde8;color:#1a7a1a;border:1px solid #a9e8a9;border-radius:50px;padding:2px 10px;font-size:0.72rem;font-weight:600;">✓ Semua bebas</span>'
+    elif not free_here:
+        badge = '<span style="background:#fde8e8;color:#c0392b;border:1px solid #e8a9a9;border-radius:50px;padding:2px 10px;font-size:0.72rem;font-weight:600;">✗ Penuh</span>'
+    else:
+        badge = (
+            f'<span style="background:#e8fde8;color:#1a7a1a;border:1px solid #a9e8a9;border-radius:50px;padding:2px 10px;font-size:0.72rem;font-weight:600;">{len(free_here)} bebas</span>'
+            f' &nbsp;<span style="background:#fde8e8;color:#c0392b;border:1px solid #e8a9a9;border-radius:50px;padding:2px 10px;font-size:0.72rem;font-weight:600;">{len(busy_here)} terpakai</span>'
+        )
+
+    # Header area
+    st.markdown(f"""
+    <div style="background:white;border-radius:12px;padding:0.75rem 1.1rem 0.55rem;
+                margin-bottom:0.5rem;border:1px solid rgba(0,0,0,0.07);
+                box-shadow:0 1px 6px rgba(0,0,0,0.04);">
+        <div style="font-family:'Outfit',sans-serif;font-size:1rem;font-weight:700;
+                    color:#2D2522;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span class="material-symbols-outlined" style="font-size:1.1rem;color:{GOLD};vertical-align:middle;">{icon_name}</span>
+            {area} &nbsp; {badge}
+        </div>
+        <div style="font-size:0.75rem;color:#aaa;margin-top:3px;">{total_here} meja</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Chip grid pakai st.columns
+    table_items = sorted(tables.items())
+    for row_start in range(0, len(table_items), COLS_PER_ROW):
+        row_items = table_items[row_start : row_start + COLS_PER_ROW]
+        cols = st.columns(COLS_PER_ROW)
+        for col_idx, (meja_no, tipe) in enumerate(row_items):
+            with cols[col_idx]:
+                if meja_no in busy_map:
+                    slots    = busy_map[meja_no]
+                    slot_txt = "<br>".join(
+                        f"{s['waktu']} · {s['nama']}" for s in slots[:2]
+                    )
+                    if len(slots) > 2:
+                        slot_txt += f"<br>+{len(slots)-2} lainnya"
+                    st.markdown(f"""
+                    <div style="background:#fde8e8;border:1.5px solid #e8a9a9;border-radius:10px;
+                                padding:10px 8px;text-align:center;min-height:88px;
+                                display:flex;flex-direction:column;justify-content:center;gap:3px;">
+                        <div style="font-weight:700;font-size:0.8rem;color:#c0392b;">
+                            <span class="material-symbols-outlined" style="font-size:0.85rem;vertical-align:middle;">chair</span>
+                            Meja {meja_no}
+                        </div>
+                        <div style="font-size:0.68rem;color:#a93226;opacity:0.85;">{tipe}</div>
+                        <div style="font-size:0.65rem;color:#c0392b;opacity:0.75;line-height:1.4;">{slot_txt}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="background:#e8fde8;border:1.5px solid #a9e8a9;border-radius:10px;
+                                padding:10px 8px;text-align:center;min-height:88px;
+                                display:flex;flex-direction:column;justify-content:center;gap:3px;">
+                        <div style="font-weight:700;font-size:0.8rem;color:#1a7a1a;">
+                            <span class="material-symbols-outlined" style="font-size:0.85rem;vertical-align:middle;">check_circle</span>
+                            Meja {meja_no}
+                        </div>
+                        <div style="font-size:0.68rem;color:#1a7a1a;opacity:0.8;">{tipe}</div>
+                        <div style="font-size:0.65rem;color:#1a7a1a;opacity:0.55;">Tersedia</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+        # Isi kolom kosong di baris terakhir
+        for empty_idx in range(len(row_items), COLS_PER_ROW):
+            cols[empty_idx].empty()
+
+    st.markdown("<div style='margin-bottom:1.2rem;'></div>", unsafe_allow_html=True)
+
 st.markdown("---")
 st.caption("Smart Reservation System · Manajemen Reservasi · Kelompok 3 Hana Jatmiana")
