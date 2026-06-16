@@ -9,18 +9,20 @@ Platform manajemen reservasi restoran berbasis AI yang dibangun dengan **Streaml
 ## Struktur Project
 
 ```
-cloned_repo/
+Smart-Reservation-Restaurantt/
 ├── Beranda.py                      # Entry point – chatbot Sara Nusantara & login admin
 ├── utils.py                        # Data loader, shared CSS, konstanta warna
 ├── data.json                       # Dataset sintetis 500 reservasi (local fallback)
 ├── requirements.txt                # Dependensi Python
 ├── README.md
+├── FRONTEND_GUIDE.md               # Panduan teknis UI/CSS Streamlit
 ├── .env                            # API key (tidak di-commit ke Git)
 ├── .gitignore
-├── assets/                         # Logo dan aset gambar
+├── assets/
+│   └── sara_logo.png               # Logo Sara Nusantara
 ├── styles/
 │   ├── main.css                    # CSS halaman chat (Beranda)
-│   └── admin.css                   # CSS kelas status badge (future use)
+│   └── admin.css                   # CSS kelas status badge
 ├── .streamlit/
 │   └── config.toml                 # Tema warna & konfigurasi server
 └── pages/
@@ -75,11 +77,9 @@ Akses di browser: **http://localhost:8501**
 
 ## Sistem Login Admin
 
-Login admin menggunakan tombol **Masuk** di pojok kanan atas header. Klik tombol → masukkan password → klik Verifikasi.
+Login admin menggunakan tombol **Masuk** di pojok kanan atas nav bar. Klik tombol → masukkan password → klik Verifikasi. Setelah login, admin diarahkan ke Dashboard Analytics.
 
 **Password default:** `admin123`
-
-Setelah login, admin diarahkan ke Dashboard Analytics dan dapat mengakses semua halaman admin via sidebar.
 
 > Untuk production, simpan password sebagai environment variable.
 
@@ -121,6 +121,22 @@ Hanya dapat diakses admin.
 
 ---
 
+## Arsitektur UI
+
+Setiap halaman memiliki tiga lapisan visual yang bekerja bersama:
+
+| Lapisan | File | Dipakai oleh |
+|---|---|---|
+| Nav bar fixed full-width | Inline di tiap halaman | Semua halaman (Beranda + admin) |
+| Shared admin CSS | `COMMON_CSS` di `utils.py` | Kedua halaman admin |
+| Page-specific CSS | Inline `st.markdown` per halaman | Fine-tuning tiap halaman |
+
+**Nav bar** menggunakan HTML murni (`position: fixed`) karena widget Streamlit di dalam elemen fixed tidak dapat menerima klik. Tombol "Masuk" di Beranda dirender sebagai widget Streamlit terpisah dan diposisikan fixed via CSS.
+
+**Sidebar admin** bisa disembunyikan oleh Streamlit (tombol `‹` native). Ketika tersembunyi, muncul tombol FAB oranye (☰) di pojok kiri atas untuk menampilkannya kembali. State ini disimpan di `st.session_state.admin_sidebar_open` dan dikontrol via `initial_sidebar_state` di `st.set_page_config()`.
+
+---
+
 ## Arsitektur Data
 
 `load_data()` di `utils.py` mencoba koneksi Railway MySQL terlebih dahulu. Jika MySQL kosong atau tidak tersedia, fallback ke `data.json`. Reservasi baru dari chatbot ditulis ke `data.json` lalu disinkronkan ke MySQL.
@@ -155,9 +171,9 @@ Kredensial dapat di-override via environment variable (`MYSQL_HOST`, `MYSQL_PORT
 
 ### Icons
 
-Material Symbols (Google Fonts CDN) digunakan di seluruh halaman via:
-- `":material/icon_name:"` untuk widget Streamlit
-- `<span class="material-symbols-outlined">icon_name</span>` untuk HTML
+Material Symbols (Google Fonts CDN) digunakan di seluruh halaman:
+- `":material/icon_name:"` untuk parameter `icon=` di widget Streamlit
+- `<span class="material-symbols-outlined">icon_name</span>` untuk konten HTML
 
 ### Komponen CSS Reusable
 
@@ -169,6 +185,8 @@ Didefinisikan di `COMMON_CSS` (`utils.py`), digunakan di kedua halaman admin:
 | `.section-title` | Judul section dengan garis gradient |
 | `.badge` | Pill label inline |
 | `.back-button` | Tombol gradient terracotta |
+| `.sara-nav-bar` | Nav bar fixed full-width |
+| `.sara-nav-chip` | Chip badge terracotta outline |
 
 ---
 
