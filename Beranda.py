@@ -271,13 +271,33 @@ def cek_reservasi_tool(query: str) -> dict:
         })
     return {"found": True, "reservations": rows}
 
+
+def find_reservation_by_id(reservation_id: str) -> dict:
+    query = reservation_id.strip()
+    if not query:
+        return {"found": False, "error": "Masukkan ID reservasi terlebih dahulu."}
+    return cek_reservasi_tool(query)
+
+
+def render_reservation_detail(reservation: dict) -> str:
+    return (
+        f"**ID Reservasi:** `{reservation['id']}`\n"
+        f"**Nama:** {reservation['nama']}\n"
+        f"**Tanggal:** {reservation['tanggal']} pukul {reservation['waktu']}\n"
+        f"**Area:** {reservation['area']}\n"
+        f"**Jumlah Orang:** {reservation['pax']}\n"
+        f"**Occasion:** {reservation['occasion']}\n"
+        f"**Status:** {reservation['status']}"
+    )
+
+
 def buat_reservasi_tool(nama, pax, tanggal, waktu,
                         area="Indoor", occasion="Casual Dining",
-                        special_request="Tidak ada"):
+                        special_request="Tidak ada", phone=None, email=None, duration=None):
     import random
     new_id = f"RSV{random.randint(10000, 99999):05d}"
     customer_id = f"CUST{random.randint(1000, 9999):04d}"
-    duration = 120
+    duration = duration or 120
     table_size = max(2, min(pax, 12))
     table_type = f"Meja {table_size} Orang"
     table_number = random.randint(1, 60)
@@ -288,8 +308,8 @@ def buat_reservasi_tool(nama, pax, tanggal, waktu,
         "Reservation ID": new_id,
         "Customer ID": customer_id,
         "Nama Customer": nama,
-        "No. HP": "",
-        "Email": "",
+        "No. HP": phone or "",
+        "Email": email or "",
         "Tanggal Reservasi": tanggal,
         "Waktu Reservasi": waktu,
         "Durasi (menit)": duration,
@@ -409,6 +429,25 @@ def extract_params(msg):
         h = tm.group(3) or tm.group(1)
         mn = tm.group(4) or tm.group(2) or "00"
         params["waktu"] = f"{h.zfill(2)}:{mn.zfill(2)}"
+    # phone number (simple international/local patterns)
+    ph = re.search(r"(\+62|62|0)\s*[-.]?\s*(\d{2,4})[\s\-\.]*\d{4,8}", msg)
+    if ph:
+        # normalize basic formatting
+        digits = re.sub(r"[^0-9+]", "", ph.group(0))
+        params["phone"] = digits
+    # email
+    em = re.search(r"[\w\.-]+@[\w\.-]+\.\w+", msg)
+    if em:
+        params["email"] = em.group(0)
+    # duration (minutes or hours)
+    dur = re.search(r"(durasi|lama).*?(\d+)\s*(menit|min|mnt)|(\d+)\s*menit|(\d+)\s*jam", msg, re.IGNORECASE)
+    if dur:
+        if dur.group(2):
+            params["duration"] = int(dur.group(2))
+        elif dur.group(4):
+            params["duration"] = int(dur.group(4))
+        elif dur.group(5):
+            params["duration"] = int(dur.group(5)) * 60
     for a in RESTAURANT_INFO["area"]:
         if a.lower() in msg.lower(): params["area"] = a; break
     occ_map = {"birthday":"Birthday","ulang tahun":"Birthday",
@@ -457,14 +496,16 @@ def heuristic_response(msg):
         if "pax"     not in params: missing.append("jumlah tamu")
         if "tanggal" not in params: missing.append("tanggal (format DD/MM)")
         if "waktu"   not in params: missing.append("waktu (contoh: 19:00)")
+        if "phone"   not in params: missing.append("nomor telepon")
+        if "duration" not in params: missing.append("durasi kedatangan (menit)")
         if missing:
             return ("Saya siap membantu reservasi Anda!\n\n"
                     "Mohon lengkapi informasi berikut:\n"
                     + "".join(f"• {m}\n" for m in missing)
                     + "\n**Contoh:** *Reservasi atas nama Sinta, 4 orang, "
                       "20/07, jam 19:00, area Garden, untuk anniversary*")
-        result = buat_reservasi_tool(**{k: params[k] for k in params if k in
-                                        ["nama","pax","tanggal","waktu","area","occasion"]})
+        allowed = ["nama","pax","tanggal","waktu","area","occasion","phone","email","duration"]
+        result = buat_reservasi_tool(**{k: params[k] for k in params if k in allowed})
         if not result.get("success", False):
             return (f"Maaf, terjadi masalah saat menyimpan reservasi:\n"
                     f"{result.get('error', 'Terjadi kesalahan tak terduga')}\n\n"
@@ -538,8 +579,10 @@ if st.session_state.pending_prompt:
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
+    assistant_response = process_user_message(prompt)
+    st.session_state.messages.append({"role": "assistant", "content": assistant_response})
 
-# ─────────────────── CHAT DISPLAY ───────────────────
+# ─────────────────── CHAT DISPLAY ┋─
 if not st.session_state.messages:
     # Large centered greeting
     st.markdown(
@@ -567,28 +610,26 @@ if not st.session_state.messages:
             st.session_state.pending_prompt = "Cek status reservasi saya"
             st.rerun()
 
+        st.markdown("---")
+        with st.form("form_cek_reservasi_id"):
+            st.markdown("### Cek Reservasi dengan ID")
+            reservation_id = st.text_input("Masukkan ID Reservasi", placeholder="RSV12345")
+            if st.form_submit_button("Cari Reservasi"):
+                query_result = find_reservation_by_id(reservation_id)
+                if not reservation_id.strip():
+                    st.warning("Mohon isi ID reservasi terlebih dahulu.")
+                elif not query_result.get("found", False):
+                    st.error("Reservasi tidak ditemukan. Pastikan ID benar.")
+                else:
+                    for reservation in query_result["reservations"]:
+                        st.success("Reservasi ditemukan:")
+                        st.markdown(render_reservation_detail(reservation))
+                        st.markdown("---")
 else:
-    # Display message history using standard st.chat_message
-    for msg in st.session_state.messages:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-if prompt:
-    with st.chat_message("assistant"):
-        with st.spinner("Sara Nusantara sedang memproses..."):
-            try:
-                reply = process_user_message(prompt)
-                st.markdown(reply)
-                st.session_state.messages.append({"role": "assistant", "content": reply})
-            except Exception as e:
-                err_msg = f"Maaf, saya tidak bisa memproses permintaan Anda saat ini. ({e})"
-                st.error(err_msg)
-                st.session_state.messages.append({"role": "assistant", "content": err_msg})
-
-# Centered footer disclaimer pushed below the chat input
-st.markdown(
-    "<div class='footer-disclaimer'>"
-    "Sara Nusantara dapat membuat kesalahan. Harap periksa kembali informasi penting."
-    "</div>",
-    unsafe_allow_html=True
-)
+    for message in st.session_state.messages:
+        if message["role"] == "user":
+            with st.chat_message("user"):
+                st.markdown(message["content"])
+        else:
+            with st.chat_message("assistant"):
+                st.markdown(message["content"])
