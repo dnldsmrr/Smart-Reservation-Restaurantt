@@ -216,3 +216,32 @@ div[data-testid="stChatMessage"]:has(svg[data-testid="chatAvatarIcon-user"]) li 
     padding-left: 1.5rem !important;
     padding-right: 1.5rem !important;
 }
+
+/* ========================================================================= */
+/* HIDE "PRESS ENTER TO SUBMIT" HINT IN FORMS                                */
+/* ========================================================================= */
+[data-testid="InputInstructions"] {
+    display: none !important;
+}
+
+/* ========================================================================= */
+/* INLINE CODE INSIDE ASSISTANT CHAT BUBBLE                                  */
+/* ========================================================================= */
+div[data-testid="stChatMessage"]:has(svg[data-testid="chatAvatarIcon-assistant"]) code,
+div[data-testid="stChatMessage"]:has(div[data-testid="stChatMessageAvatarAssistant"]) code {
+    background-color: #FFF3EE !important;
+    color: #D4522A !important;
+    border: 1px solid #FFE0D3 !important;
+    border-radius: 5px !important;
+    padding: 1px 7px !important;
+    font-size: 0.88em !important;
+    font-family: 'Inter', monospace !important;
+    font-weight: 600 !important;
+}
+
+/* Bolder section headers inside assistant bubble */
+div[data-testid="stChatMessage"]:has(svg[data-testid="chatAvatarIcon-assistant"]) strong,
+div[data-testid="stChatMessage"]:has(div[data-testid="stChatMessageAvatarAssistant"]) strong {
+    color: #2D2522 !important;
+    font-weight: 700 !important;
+}

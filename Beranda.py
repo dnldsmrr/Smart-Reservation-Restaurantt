@@ -467,9 +467,9 @@ def heuristic_response(msg):
     if intent == "greeting":
         return ("Halo! Selamat datang di **Mandala Rasa**\n\n"
                 "Saya **Sara Nusantara**, asisten reservasi Anda. Ada yang bisa saya bantu?\n\n"
-                "• **Buat reservasi** meja\n"
-                "• **Cek status** reservasi\n"
-                "• **Info restoran** (jam, area, fasilitas, kebijakan)")
+                "**Buat reservasi** — pesan meja untuk kunjungan Anda\n\n"
+                "**Cek reservasi** — lihat detail & status reservasi\n\n"
+                "**Info restoran** — jam buka, area, fasilitas, kebijakan")
 
     if intent == "cek_reservasi":
         q = re.sub(r"(cek|status|check|reservasi|detail|atas nama|nama)\s*",
@@ -478,17 +478,22 @@ def heuristic_response(msg):
             return "Silakan sebutkan **nama lengkap** atau **ID reservasi** Anda.\nContoh: *cek reservasi atas nama Budi*"
         result = cek_reservasi_tool(q)
         if not result["found"]:
-            return (f"Maaf, reservasi atas nama/ID **\"{q}\"** tidak ditemukan.\n\n"
+            return (f"Maaf, reservasi atas nama atau ID **\"{q}\"** tidak ditemukan.\n\n"
                     "Pastikan penulisan nama sudah benar, atau coba masukkan ID reservasi "
-                    "yang tertera di konfirmasi (contoh: RSV00001).")
+                    "yang tertera di konfirmasi Anda, contoh: `RSV00001`.")
         rows = result["reservations"]
-        resp = f"Ditemukan **{len(rows)} reservasi**:\n\n"
-        for r in rows:
-            resp += (f"**{r['id']}** · {r['nama']}\n"
-                     f"Tanggal: {r['tanggal']} pukul {r['waktu']} · {r['pax']} orang\n"
-                     f"Area: {r['area']} · {r['occasion']}\n"
-                     f"Status: **{r['status']}**\n\n")
-        return resp.strip()
+        label = "reservasi" if len(rows) == 1 else "reservasi"
+        resp = f"Ditemukan **{len(rows)} {label}** atas nama **{q}**:\n\n"
+        for i, r in enumerate(rows):
+            resp += (f"**{r['id']}**  \n"
+                     f"Nama: {r['nama']}  \n"
+                     f"Tanggal: {r['tanggal']} pukul {r['waktu']}  \n"
+                     f"Tamu: {r['pax']} orang — Area: {r['area']}  \n"
+                     f"Occasion: {r['occasion']}  \n"
+                     f"Status: **{r['status']}**")
+            if i < len(rows) - 1:
+                resp += "\n\n---\n\n"
+        return resp
 
     if intent == "buat_reservasi":
         missing = []
@@ -499,10 +504,11 @@ def heuristic_response(msg):
         if "phone"   not in params: missing.append("nomor telepon")
         if "duration" not in params: missing.append("durasi kedatangan (menit)")
         if missing:
+            missing_list = "\n\n".join(f"**{m}**" for m in missing)
             return ("Saya siap membantu reservasi Anda!\n\n"
-                    "Mohon lengkapi informasi berikut:\n"
-                    + "".join(f"• {m}\n" for m in missing)
-                    + "\n**Contoh:** *Reservasi atas nama Sinta, 4 orang, "
+                    "Mohon lengkapi informasi berikut:\n\n"
+                    + missing_list
+                    + "\n\n*Contoh: Reservasi atas nama Sinta, 4 orang, "
                       "20/07, jam 19:00, area Garden, untuk anniversary*")
         allowed = ["nama","pax","tanggal","waktu","area","occasion","phone","email","duration"]
         result = buat_reservasi_tool(**{k: params[k] for k in params if k in allowed})
@@ -513,15 +519,15 @@ def heuristic_response(msg):
 
         d = result["detail"]
         warning_msg = result.get("warning")
-        response = (f"**Reservasi berhasil dibuat!**\n\n"
-                    f"┌ ID Reservasi: **`{result['reservation_id']}`**\n"
-                    f"├ Nama: {d['nama']}\n"
-                    f"├ Tamu: {d['pax']} orang\n"
-                    f"├ Tanggal: {d['tanggal']} pukul {d['waktu']}\n"
-                    f"├ Area: {d['area']}\n"
-                    f"├ Occasion: {d['occasion']}\n"
-                    f"└ Status: **Confirmed**\n\n"
-                    "Simpan ID reservasi Anda. Konfirmasi akan dikirim via WhatsApp.")
+        response = (f"Reservasi Anda telah berhasil dikonfirmasi!\n\n"
+                    f"**ID Reservasi:** `{result['reservation_id']}`  \n"
+                    f"**Nama:** {d['nama']}  \n"
+                    f"**Jumlah Tamu:** {d['pax']} orang  \n"
+                    f"**Tanggal:** {d['tanggal']} pukul {d['waktu']}  \n"
+                    f"**Area:** {d['area']}  \n"
+                    f"**Occasion:** {d['occasion']}  \n"
+                    f"**Status:** Confirmed\n\n"
+                    "Harap simpan ID reservasi Anda. Tim kami akan menghubungi melalui WhatsApp untuk konfirmasi lebih lanjut.")
         if warning_msg:
             response += (f"\n\nCatatan: {warning_msg}\n"
                          "Data tetap tersimpan secara lokal.")
@@ -558,10 +564,10 @@ def heuristic_response(msg):
                 "*fasilitas*, atau *kebijakan*?")
 
     return ("Hmm, saya belum sepenuhnya memahami permintaan Anda.\n\n"
-            "Saya bisa membantu dengan:\n"
-            "• **Buat reservasi** — *Reservasi 4 orang, 20 Juli, jam 19:00*\n"
-            "• **Cek reservasi** — *Cek reservasi atas nama Andi*\n"
-            "• **Info restoran** — *Jam buka berapa? Ada WiFi?*\n\n"
+            "Saya bisa membantu dengan:\n\n"
+            "**Buat reservasi** — *Reservasi 4 orang, 20 Juli, jam 19:00*\n\n"
+            "**Cek reservasi** — *Cek reservasi atas nama Andi*\n\n"
+            "**Info restoran** — *Jam buka berapa? Ada WiFi?*\n\n"
             "Silakan coba lagi dengan kalimat yang lebih spesifik.")
 
 def process_user_message(user_input: str) -> str:

@@ -8,11 +8,15 @@ Dokumen ini menjelaskan cara Streamlit membangun tampilan UI dan bagaimana CSS d
 
 ### Konsep Dasar: Kode Python = Tampilan
 
+
+
 Di Streamlit, kamu tidak menulis HTML secara langsung seperti di website biasa. Setiap baris Python yang kamu tulis langsung menghasilkan elemen di halaman.
 
 ```python
 st.title("Halo Dunia")          # → muncul judul besar
 st.write("Ini teks biasa")      # → muncul paragraf
+st.button("Klik Saya")          # → muncul tombol
+
 st.button("Klik Saya")          # → muncul tombol
 ```
 

@@ -74998,5 +74998,30 @@
     "Catatan Staff": null,
     "Tanggal": "2026-12-31",
     "Bulan": 12
+  },
+  {
+    "Reservation ID": "RSV77568",
+    "Customer ID": "CUST9220",
+    "Nama Customer": "Vino",
+    "No. HP": "",
+    "Email": "",
+    "Tanggal Reservasi": "2025-07-20",
+    "Waktu Reservasi": "19:00",
+    "Durasi (menit)": 120,
+    "Jumlah Orang": 4,
+    "Area Meja": "Garden",
+    "Tipe Meja": "Meja 4 Orang",
+    "Nomor Meja": 21,
+    "Occasion": "Anniversary",
+    "Special Request": "Tidak ada",
+    "Estimasi Budget/Orang (IDR)": 150000,
+    "Total Estimasi (IDR)": 600000,
+    "Metode Pembayaran": "Onsite",
+    "Channel Booking": "AI Assistant",
+    "Status Reservasi": "Confirmed",
+    "Rating": null,
+    "Catatan Staff": null,
+    "Tanggal": "2025-07-20",
+    "Bulan": 7
   }
 ]
