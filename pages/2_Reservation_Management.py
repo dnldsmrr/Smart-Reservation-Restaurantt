@@ -488,6 +488,12 @@ st.markdown("""
     border: 1px solid #FFD5C2;
     margin-bottom: 1.2rem;
 }
+/* Aksi Cepat: keep "Hari Ini" / "Besok" on a single line in their tight columns */
+div.element-container:has(#aksi-cepat-marker) + div[data-testid="stHorizontalBlock"] .stButton > button {
+    white-space: nowrap !important;
+    padding: 0.4rem 0.5rem !important;
+    font-size: 0.85rem !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -527,8 +533,8 @@ with ctrl_col1:
         key="avail_date_picker"
     )
 with ctrl_col2:
-    st.markdown('<div class="avail-date-label">Aksi Cepat</div>', unsafe_allow_html=True)
-    jump_cols = st.columns(2)
+    st.markdown('<div class="avail-date-label">Aksi Cepat</div><span id="aksi-cepat-marker" style="display:none;"></span>', unsafe_allow_html=True)
+    jump_cols = st.columns(2, gap="small")
     with jump_cols[0]:
         if st.button("Hari Ini", use_container_width=True, key="btn_jump_today"):
             st.session_state["avail_date_picker"] = _dt.date.today()
