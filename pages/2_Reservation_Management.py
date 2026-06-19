@@ -521,6 +521,12 @@ AREA_ICONS = {
 }
 
 # ── Kontrol: pilih tanggal ──
+def _jump_to_today():
+    st.session_state["avail_date_picker"] = _dt.date.today()
+
+def _jump_to_tomorrow():
+    st.session_state["avail_date_picker"] = _dt.date.today() + _dt.timedelta(days=1)
+
 ctrl_col1, ctrl_col2 = st.columns([2, 1])
 with ctrl_col1:
     st.markdown('<div class="avail-date-label">Pilih Tanggal</div>', unsafe_allow_html=True)
@@ -536,13 +542,9 @@ with ctrl_col2:
     st.markdown('<div class="avail-date-label">Aksi Cepat</div><span id="aksi-cepat-marker" style="display:none;"></span>', unsafe_allow_html=True)
     jump_cols = st.columns(2, gap="small")
     with jump_cols[0]:
-        if st.button("Hari Ini", use_container_width=True, key="btn_jump_today"):
-            st.session_state["avail_date_picker"] = _dt.date.today()
-            st.rerun()
+        st.button("Hari Ini", use_container_width=True, key="btn_jump_today", on_click=_jump_to_today)
     with jump_cols[1]:
-        if st.button("Besok", use_container_width=True, key="btn_jump_tomorrow"):
-            st.session_state["avail_date_picker"] = _dt.date.today() + _dt.timedelta(days=1)
-            st.rerun()
+        st.button("Besok", use_container_width=True, key="btn_jump_tomorrow", on_click=_jump_to_tomorrow)
 
 selected_date_str = selected_date.strftime("%Y-%m-%d")
 is_today  = (selected_date == _dt.date.today())
